@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+
+env:
+  IMAGE: docker.io/${{ secrets.DOCKER_USERNAME }}/netflix:${{ github.sha }}
+
+jobs:
+  build_image_and_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: SonarCloud analysis
+        #if: ${{ secrets.SONAR_TOKEN && secrets.SONAR_ORG }}
+        uses: sonarsource/sonarcloud-github-action@v5.0.0
+        with:
+          projectBaseDir: ./app
+          args: >
+              -Dsonar.organization=${{ secrets.SONAR_ORG }}
+              -Dsonar.projectKey=DevSecOps-Project
+              -Dsonar.projectName=DevSecOps-Project
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+
+      - id: sonar_qg
+        name: Wait for SonarQube quality gate 
+        #if: ${{ secrets.SONAR_TOKEN }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          PROJECT_KEY: DevSecOps-Project
+        run: |
+          echo "Polling SonarQube for quality gate (will not abort pipeline automatically)."
+          status="IN_PROGRESS"
+          for i in {1..30}; do
+            status=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=$PROJECT_KEY" | jq -r '.projectStatus.status')
+            echo "Attempt $i - quality gate status: $status"
+            if [ "$status" != "IN_PROGRESS" ]; then break; fi
+            sleep 10
+          done
+          echo "Final Sonar status: $status"
+          echo "qg_status=$status" >> $GITHUB_OUTPUT
+
+      - name: Trivy - filesystem scan
+        id: trivy_fs_action
+        #if: ${{ (secrets.SONAR_TOKEN && steps.sonar_qg.outputs.qg_status == 'OK') || !secrets.SONAR_TOKEN }}
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: fs
+          format: table
+          output: trivyfs.txt
+          severity: HIGH,CRITICAL
+        continue-on-error: true
+
+      - name: Parse Trivy FS results
+        id: parse_trivy_fs
+        if: ${{ always() }}
+        run: |
+          if [ -f trivyfs.txt ] && grep -q "CRITICAL\|HIGH" trivyfs.txt; then
+            echo "fs_vulns_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "fs_vulns_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker image
+        #if: ${{ (steps.sonar_qg.outputs.qg_status == 'OK' || !secrets.SONAR_TOKEN) && steps.parse_trivy_fs.outputs.fs_vulns_found == 'false' }}
+        run: |
+          echo "Building Docker image"
+          cd ./app
+          docker build --build-arg TMDB_V3_API_KEY=${{ secrets.TMDB_KEY }} -t $IMAGE .
+
+      - name: Trivy - image scan
+        id: trivy_image_action
+        #if: ${{ steps.sonar_qg.outputs.qg_status == 'OK' || !secrets.SONAR_TOKEN }}
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          output: trivyimage.txt
+          severity: HIGH,CRITICAL
+        continue-on-error: true
+
+      - name: Parse Trivy image results
+        id: parse_trivy_image
+        if: ${{ always() }}
+        run: |
+          if [ -f trivyimage.txt ] && grep -q "CRITICAL\|HIGH" trivyimage.txt; then
+            echo "image_vulns_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "image_vulns_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Trivy FS report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs
+          path: trivyfs.txt
+
+      - name: Upload Trivy image report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image
+          path: trivyimage.txt
+
+      - name: Login to Docker Hub (to push)
+        #if: ${{ secrets.DOCKER_USERNAME && secrets.DOCKER_PASSWORD }}
+        uses: docker/login-action@v2
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Tag & Push to Docker Hub
+        id: push_image
+        #if: ${{ secrets.DOCKER_USERNAME && secrets.DOCKER_PASSWORD && (steps.sonar_qg.outputs.qg_status == 'OK' || !secrets.SONAR_TOKEN) && steps.parse_trivy_fs.outputs.fs_vulns_found != 'true' && steps.parse_trivy_image.outputs.image_vulns_found != 'true' }}
+        run: |
+          echo "Tagging and pushing to Docker Hub"
+          docker push $IMAGE
