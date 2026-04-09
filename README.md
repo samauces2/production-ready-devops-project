@@ -82,15 +82,6 @@ Built to demonstrate real DevOps engineering skills — not just theory.
 
 ##  Application Preview
 <div align="center">
-  <img src="./app/public/assets/DevSecOps.png" alt="Logo" width="100%" height="100%">
-
-  <br>
-    <img src="./app/public/assets/netflix-logo.png" alt="Logo" width="100" height="32">
-</div>
-
-<br />
-
-<div align="center">
   <img src="./app/public/assets/home-page.png" alt="Logo" width="100%" height="100%">
   <p align="center">Home Page</p>
 </div>
