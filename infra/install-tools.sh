@@ -88,7 +88,7 @@ GIT_TOKEN=$GIT_TOKEN
 
 kubectl create secret generic repo-github \
   --namespace argocd \
-  --from-literal=url=https://github.com/samauces2/DevSecOps-Demo \
+  --from-literal=url=https://github.com/samauces2/production-ready-devops-project \
   --from-literal=username=$GIT_USER \
   --from-literal=password=$GIT_TOKEN \
   --type=kubernetes.io/basic-auth || true
