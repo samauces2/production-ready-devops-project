@@ -110,9 +110,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/samauces2/DevSecOps-Demo
-    targetRevision: infra
-    path: kubernetes
+    repoURL: https://github.com/samauces2/production-ready-devops-project
+    targetRevision: Main
+    path: infra/kubernetes
   destination:
     server: https://kubernetes.default.svc
     namespace: default
