@@ -23,7 +23,7 @@ Follow these steps:
 ### resources will be deleted in 10 minutes after deployment, I don't want to maintain (pay $$$) anything :D
 
 <p align="center">
-  <a href="https://github.com/samauces2/DevSecOps-Demo/actions/workflows/ci_cd.yml">
+  <a href="https://github.com/samauces2/production-ready-devops-project/actions/workflows/ci_cd.yml">
     <img src="https://img.shields.io/badge/ Run%20Pipeline-GitHub%20Actions-blue?style=for-the-badge">
   </a>
 </p>
