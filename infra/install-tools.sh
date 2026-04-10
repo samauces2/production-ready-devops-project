@@ -78,26 +78,9 @@ ARGOCD_PASSWORD=$(kubectl get secret -n argocd argocd-initial-admin-secret \
 
 echo -e "\033[33m[WARN]\033[0mArgoCD admin password: $ARGOCD_PASSWORD"
 
-############################
-# 9. GITHUB ACCESS
-############################
-echo -e "\033[33m[WARN]\033[0mConfiguring GitHub access..."
-
-GIT_USER=$GIT_USER
-GIT_TOKEN=$GIT_TOKEN
-
-kubectl create secret generic repo-github \
-  --namespace argocd \
-  --from-literal=url=https://github.com/samauces2/production-ready-devops-project \
-  --from-literal=username=$GIT_USER \
-  --from-literal=password=$GIT_TOKEN \
-  --type=kubernetes.io/basic-auth || true
-
-kubectl label secret repo-github \
-  -n argocd argocd.argoproj.io/secret-type=repository || true
 
 ############################
-# 10. CREATE APPLICATION
+# 9. CREATE APPLICATION
 ############################
 echo -e "\033[34m[INFO]\033[0mCreating ArgoCD Application..."
 
